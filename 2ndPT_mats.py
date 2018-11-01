@@ -8,6 +8,7 @@ from sys import argv,exit
 from os import getcwd
 from time import time,ctime
 from matslib import *
+import params as p
 
 from pytriqs.gf.local import *
 from pytriqs.archive import *
@@ -17,41 +18,49 @@ hashes = '#'*60
 
 ## HDF5 output
 hdf5file = 'squad_mats.h5'
+WriteHDF5 = False
+
+## log file
+logfname = '2ndPT.log'
 
 ## convergence criteria
-eps_hf  = 1e-4
-eps_2nd = 1e-4
+eps_hf  = p.P['eps_hf']
+eps_2nd = p.P['eps_2nd']
 
 U      = float(argv[1])
 beta   = float(argv[2])
+eps    = float(argv[3])
+B      = float(argv[4])
 Delta  = 1.0
 GammaL = 0.5
 GammaR = 0.5
 GammaN = 0.0
 P      = 0.5
-eps    = float(argv[3])
-try:
-	B = float(argv[4])
-except IndexError:
-	B = 0.0
-iw_cut = 100.0	 # energy cutoff in Matsubaras
-BW     = 1000.0 # half-bandwidth
+
+## energy cutoffs in imaginary and real axes
+iw_cut = p.P['iw_cut'] # energy cutoff in Matsubaras
+BW     = p.P['BW']     # half-bandwidth
 
 ## mixing parameters
-alpha_hf  = 0.2
-alpha_2nd = 0.2
+alpha_hf  = p.P['alpha_hf']
+alpha_2nd = p.P['alpha_2nd']
 
 ## Pade continuation parameters
-emax   = 10.0
-NRealP = 20000
-NMats_cont = 50
-izero = 1e-3
+emax   = p.P['pade_emax']
+NRealP = p.P['pade_NReal']
+NMatsP = p.P['pade_NMats']
+izero  = p.P['pade_izero']
+
+## parameter for output file names
+if   p.P['param'] == 'U':   par = U
+elif p.P['param'] == 'eps': par = eps
+elif p.P['param'] == 'B':   par = B
+elif p.P['param'] == 'P':   par = P
+else:                       par = U	## default
 
 bands_T  = ['up','dn']
 params_A = [beta,U,Delta,GammaL,GammaR,GammaN,eps,P,B]
-
 NMats = int(0.5*(beta*iw_cut/sp.pi)+1.0)
-logfname = '2ndPT.log'
 
 ###########################################################
 PrintAndWrite(hashes+'\nWorking directory: '+str(getcwd()),logfname)
@@ -86,6 +95,10 @@ while any([sp.fabs(n-nold) > eps_hf,sp.fabs(m-mold) > eps_hf,sp.fabs(mu-muold) >
 	N0_A = alpha_hf*N0_A+(1.0-alpha_hf)*Nold_A
 	niter += 1
 	PrintAndWrite('  {0: 3d}\t{1: .8f}\t{2: .8f}\t{3: .8f}'.format(niter,n,m,mu),logfname)
+	if niter > 2000:
+		PrintAndWrite('HF: no convergence after 2000 iterations, exit.',logfname)
+		exit(1)
+
 PrintAndWrite('  ...done in {0: 3d} seconds.'.format(int(time()-t)),logfname)
 
 WriteG_iw(G0_iw,'gwhf',logfname)
@@ -94,11 +107,11 @@ NZero_A = TotalDensity(G0_iw)
 PrintAndWrite('\n  Occupation matrix from G_HF(iw):',logfname)
 WriteMatrix(NZero_A,bands_T,'M',logfname)
 
-G0_real = PadeContinuation(G0_iw,emax,NRealP,NMats_cont,izero)
-WriteG_real(G0_real,'grhf',logfname)
-WriteG_real(G0_real,'grhf'+str(B),logfname)
+G0_real = PadeContinuation(G0_iw,emax,NRealP,NMatsP,izero)
+#WriteG_real(G0_real,'grhf',logfname)
+WriteG_real(G0_real,'grhf'+p.P['param']+str(par),logfname)
 
-PrintAndWrite('{0: .4f}\t{1: .4f}\t{2: .4f}\t{3: .8f}\t{4: .8f}\t{5: .8f}'.format(U,eps,B,n,m,mu),logfname)
+PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:HF_OUT'.format(U,eps,B,n,m,mu),logfname)
 
 ###########################################################
 ## second order correction ################################
@@ -106,39 +119,21 @@ PrintAndWrite('{0: .4f}\t{1: .4f}\t{2: .4f}\t{3: .8f}\t{4: .8f}\t{5: .8f}'.forma
 PrintAndWrite('\nCalculating the two-particle bubble...',logfname)
 Chi = TwoParticleBubbleFFT(G0_iw,G0_iw)
 WriteG_iw(Chi,'chiw',logfname)
-'''
-if 0:
-	PrintAndWrite('  Hartree-Fock data saved to '+hdf5file+' archive.',logfname)
-	R = HDFArchive(hdf5file,'w')
-	R['g0_iw'] = G0_iw
-	R['chi']   = Chi
-	R['n']     = n
-	R['mu']    = mu
-	del R
 
-if 0:
-	PrintAndWrite('  Hartree-Fock data read from '+hdf5file+' archive.',logfname)
-	R = HDFArchive(hdf5file,'r')
-	Chi   = R['chi']
-	G0_iw = R['g0_iw']
-	n     = R['n']
-	mu    = R['mu']
-	del R
-'''
-Chi_real = PadeContinuation(Chi,emax,NRealP,50,izero)
+Chi_real = PadeContinuation(Chi,emax,NRealP,NMatsP,izero)
 WriteG_real(Chi_real,'chir',logfname)
 
 PrintAndWrite('\nCalculating the kernel of the Schwinger-Dyson equation...',logfname)
 Psi = GfImFreq(indices = [0], beta = beta, n_points = NMats, statistic = 'Boson')
 Psi << U**2*(Chi['up','up']+Chi['up','dn'])
 WriteG_iw(Psi,'psiw',logfname)
-Psi_real = PadeContinuation(Psi,emax,NRealP,50,izero)
+Psi_real = PadeContinuation(Psi,emax,NRealP,NMatsP,izero)
 WriteG_real(Psi_real,'psir',logfname)
 
 PrintAndWrite('\nCalculating the 2ndPT dynamic self-energy...',logfname)
 Sigma = SelfEnergy(G0_iw,Psi)
 WriteG_iw(Sigma,'sw',logfname)
-Sigma_real = PadeContinuation(Sigma,emax,NRealP,50,izero)
+Sigma_real = PadeContinuation(Sigma,emax,NRealP,NMatsP,izero)
 WriteG_real(Sigma_real,'sr',logfname)
 
 Gint_iw = G0_iw.copy()
@@ -148,7 +143,6 @@ PrintAndWrite('\nCorrecting the Hartree-Fock self-energy...',logfname)
 N_A = N0_A.copy()
 [nold,mold,muold] = [1e5,1e5,1e5]
 [n,m,mu] = Occupation(N_A)
-#[n,mu] = [N0_A[0][0],N0_A[0][1]]
 PrintAndWrite('\n    iter\tn\tm\t\tmu',logfname)
 niter = 0
 while any([sp.fabs(n-nold) > eps_2nd,sp.fabs(m-mold) > eps_2nd,sp.fabs(mu-muold) > eps_2nd]):
@@ -161,6 +155,9 @@ while any([sp.fabs(n-nold) > eps_2nd,sp.fabs(m-mold) > eps_2nd,sp.fabs(mu-muold)
 	[n,m,mu] = Occupation(N_A)
 	niter += 1
 	PrintAndWrite('  {0: 3d}\t{1: .8f}\t{2: .8f}\t{3: .8f}'.format(niter,n,m,mu),logfname)
+	if niter > 2000:
+		PrintAndWrite('2ndPT: no convergence after 2000 iterations, exit.',logfname)
+		exit(1)
 
 PrintAndWrite('\nCalculating the 2ndPT interacting Green function...',logfname)
 
@@ -171,14 +168,26 @@ PrintAndWrite('\n  Occupation matrix from G(iw):',logfname)
 WriteMatrix(N_A,bands_T,'M',logfname)
 [n,m,mu] = Occupation(N_A)
 
-Gint_real = PadeContinuation(Gint_iw,emax,NRealP,50,izero)
-WriteG_real(Gint_real,'gr'+str(B),logfname)
+Gint_real = PadeContinuation(Gint_iw,emax,NRealP,NMatsP,izero)
+WriteG_real(Gint_real,'gr'+p.P['param']+str(par),logfname)
 #WriteG_real(Gint_real,'gr',logfname)
 
-PrintAndWrite('{0: .4f}\t{1: .4f}\t{2: .4f}\t{3: .8f}\t{4: .8f}\t{5: .8f}'.format(U,eps,B,n,m,mu),logfname)
+PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:2nd_OUT'.format(U,eps,B,n,m,mu),logfname)
+
+## write HDF5 archive
+if WriteHDF5:
+	PrintAndWrite('  Hartree-Fock data saved to '+hdf5file+' archive.',logfname)
+	R = HDFArchive(hdf5file,'w')
+	R['ghf']   = G0_iw
+	R['chi']   = Chi
+	R['sigma'] = Sigma
+	R['gint']  = Gint_iw
+	R['n']     = n
+	R['m']     = m
+	R['mu']    = mu
+	del R
 
 PrintAndWrite('# '+str(argv[0])+' END, '+ctime(),logfname)
 
 ## 2ndPT_mats.py end ##
-
 
