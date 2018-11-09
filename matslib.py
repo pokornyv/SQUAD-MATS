@@ -46,14 +46,14 @@ def TotalDensity(G):
 	''' calculates the density from a Green function '''
 	bands_T = G.indices
 	NBand = len(bands_T)
-	N_F = sp.zeros([NBand,NBand])
+	N_A = sp.zeros([NBand,NBand])
 	for i,j in product(range(NBand), repeat = 2):
-		N_F[i][j] = sp.real(G[bands_T[i],bands_T[j]].total_density())
-	return N_F
+		N_A[i][j] = sp.real(G[bands_T[i],bands_T[j]].total_density())
+	return N_A
 
 
 def Occupation(N_A):
-	''' calculates n,m,mu from occupation matrix N '''
+	''' calculates n,m,mu from the occupation matrix N '''
 	n  = 0.5*(N_A[0][0]-N_A[1][1]+1.0)
 	m  = 0.5*(N_A[0][0]+N_A[1][1]-1.0)
 	mu = 0.5*(N_A[0][1]+N_A[1][0])
@@ -70,7 +70,7 @@ def IntFiniteBW(Delta,W,iw):
 
 def HybDiag(GammaL,GammaR,Delta,W,iw):
 	''' diagonal part of the finite-bandwidth sc lead hybridization, real 
-	    caution, does not contain the iw_n factor from the matrix!!! '''
+	does not contain the iw_n factor from the matrix '''
 	return (GammaL+GammaR)*IntFiniteBW(Delta,W,iw)
 
 
@@ -86,13 +86,20 @@ def HybOffDiag(GammaL,GammaR,Delta,P,W,iw):
 def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
 	''' constructs the non-interacting Green function as the input '''
 	[beta,U,Delta,GL,GR,GN,eps,P,B] = params_A
-	[n,m,mu] = Occupation(N_A)
+	#[n,m,mu] = Occupation(N_A)
+	#print n,m,mu
 	V2 = BW*GN/sp.pi  # hybridization with normal lead
 	## define lambdas (hybridizations are real)
-	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + (B + U*m) 
-	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
-	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
-	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + (B + U*m)
+	## old definitions from the SQUAD-CTHYB code:
+	#GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + B + U*m 
+	#GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
+	#GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
+	#GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + B + U*m
+	## new definitions:
+	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - eps - U/2.0 + B + U*N_A[1][1]
+	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*N_A[0][1]
+	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*N_A[1][0]
+	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + eps - U/2.0 + B + U*N_A[0][0]
 	## define GF objects
 	GFinv = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
 	GF    = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
@@ -109,7 +116,7 @@ def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
 	GFinv.fit_tail(fixed_tail,NTerms,FitMin,FitMax)
 	## calculate inverse
 	GF << inverse(GFinv)
-	## refit the tail, just in case
+	## refit the tail, just in case.
 	GF.tail.zero()
 	fixed_tail = TailGf(2,2,3,-1)
 	fixed_tail[-1] = sp.zeros([2,2])
@@ -129,36 +136,7 @@ def PadeContinuation(GFw,emax,NRealP,NMats,izero):
 	return GFr
 
 ###########################################################
-"""
-def RollGF(GF,m,NM):
-	''' roll the data in Green function by a given bosonic frequency 
-	return the shifted data array extended to [-NMats,NMats] interval '''
-	NBand = len(GF.indices)
-	Data_A = sp.zeros([2*NM,NBand,NBand],dtype=complex)
-	offset = NM-len(GF.data)/2
-	for i in range(len(Data_A)):
-		if i+m < offset or i+m >= NM+len(GF.data)/2:
-			Data_A[i] = GF.tail(1.0j*OmegaN(i+m-NM,GF.beta))
-		else:
-			Data_A[i] = GF.data[i-offset+m]
-	return Data_A
-
-
-def TwoParticleBubble(GF1,GF2):
-	''' calculate the two-particle bubble as a Matsubara sum '''
-	NMats = len(GF1.data)/2
-	Chi = GfImFreq(indices = GF1.indices, beta = GF1.beta, n_points = NMats, statistic = 'Boson')
-	Int = GfImFreq(indices = GF1.indices, beta = GF1.beta, n_points = 2*NMats)
-	m = 0
-	for inu in Chi.mesh:  ## loop over bosonic frequency
-		Int.zero()
-		G1data_A = RollGF(GF1,0,2*NMats)
-		G2data_A = RollGF(GF2,m-NMats+1,2*NMats)
-		Int.data[:] = G1data_A[:]*G2data_A[:]
-		Chi.data[m] = Int.density()-sp.array([[0.0,0.0],[0.0,0.0]])
-		m += 1
-	return Chi
-"""
+## convolutions ###########################################
 
 def TwoParticleBubbleFFT(GF1,GF2t):
 	''' calculate the two-particle bubble using FFT '''
@@ -176,13 +154,14 @@ def TwoParticleBubbleFFT(GF1,GF2t):
 	GF2tau << InverseFourier(GF2)
 	flip_A = sp.array([[-1.0,1.0],[1.0,-1.0]])
 	Chitau.data[:] = flip_A*GF1tau.data[:]*GF2tau.data[:]
-	#WriteG_tau(Chitau,'chit','log.log')
+	#WriteG_tau(Chitau,'chit','out.log')
 	Chi << Fourier(Chitau)
 	## fitting the tail
 	Chi.tail.zero()
 	fixed_tail = TailGf(2,2,2,-1)
 	fixed_tail[-1] = sp.zeros([2,2])
 	fixed_tail[ 0] = sp.zeros([2,2])
+	## Chi contains artefacts from FFT at high frequencies, do not fit up to NMats
 	Chi.fit_tail(fixed_tail,6,int(0.8*NMats),int(0.9*NMats))
 	return Chi
 
@@ -195,19 +174,19 @@ def SelfEnergy(GF,Psi):
 	GFtau = GfImTime(indices = GF.indices, beta = GF.beta, n_points = 4*NMats+1)
 	Ktau  = GfImTime(indices = GF.indices, beta = GF.beta, n_points = 4*NMats+1, statistic = 'Boson')
 	Kernel = GfImFreq(indices = GF.indices, beta = GF.beta, n_points = NMats, statistic = 'Boson')
-	for i,j in product(GF.indices, repeat = 2):
-		Kernel[i,j] << Psi
+	for i,j in product(GF.indices, repeat = 2): Kernel[i,j] << Psi
 	GFtau << InverseFourier(GF)
 	Ktau  << InverseFourier(Kernel)
 	flip_A = sp.array([[-1.0,-1.0],[-1.0,-1.0]])
 	Sigmatau.data[:] = flip_A*GFtau.data[:]*Ktau.data[:]
-	#WriteG_tau(Sigmatau,'st','log.log')
+	#WriteG_tau(Sigmatau,'st','out.log')
 	Sigma << Fourier(Sigmatau)
 	## fitting the tail
 	Sigma.tail.zero()
 	fixed_tail = TailGf(2,2,2,-1)
 	fixed_tail[-1] = sp.zeros([2,2])
 	fixed_tail[ 0] = sp.zeros([2,2])
+	## Sigma contains artefacts from FFT at high frequencies, do not fit up to NMats
 	Sigma.fit_tail(fixed_tail,6,int(0.8*NMats),int(0.9*NMats))
 	return Sigma
 
@@ -231,7 +210,7 @@ def WriteG_iw(GF,fname,logfname):
 		for nw in range(NMats):
 			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
 			.format(float(MatsFreq_F[nw]),float(sp.real(GF[bands_T[i],bands_T[j]].data[nw][0][0]))\
-               ,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
+			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
 		fout.write('\n\n')
 	fout.close()
 	PrintAndWrite('  File '+fname+' written.',logfname)
@@ -253,7 +232,7 @@ def WriteG_tau(GF,fname,logfname):
 		for tau in range(NTau):
 			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
 			.format(float(Tau_F[tau]),float(sp.real(GF[bands_T[i],bands_T[j]].data[tau][0][0]))\
-               ,float(sp.imag(GF[bands_T[i],bands_T[j]].data[tau][0][0]))))
+			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[tau][0][0]))))
 		fout.write('\n\n')
 	fout.close()
 	PrintAndWrite('  File '+fname+' written.',logfname)
@@ -274,7 +253,7 @@ def WriteG_real(GF,fname,logfname):
 		for nw in range(len(Freq_F)):
 			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
 			.format(float(Freq_F[nw]),float(sp.real(GF[bands_T[i],bands_T[j]].data[nw][0][0]))\
-               ,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
+			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
 		fout.write('\n\n')
 	fout.close()
 	PrintAndWrite('  File '+fname+' written.',logfname)
@@ -290,7 +269,6 @@ def WriteMatrix(X_A,bands_T,Xtype,logfname):
 		else: out_text += '{0: .6f}{1:+0.6f}i\t'.format(float(sp.real(X_A[i][j])),float(sp.imag(X_A[i][j])))
 		if j==len(bands_T)-1: out_text += '\n'
 	PrintAndWrite(out_text,logfname)
-
 
 ## matslib.py end ##
 

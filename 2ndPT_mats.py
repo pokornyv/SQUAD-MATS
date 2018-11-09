@@ -26,6 +26,7 @@ logfname = '2ndPT.log'
 ## convergence criteria
 eps_hf  = p.P['eps_hf']
 eps_2nd = p.P['eps_2nd']
+nmax_iter = 1000  ## maximum number of iterations before breaking cycle
 
 U      = float(argv[1])
 beta   = float(argv[2])
@@ -78,11 +79,12 @@ PrintAndWrite('Using {0: 3d} Matsubara frequencies, cutoff: {1: .3f}'\
 
 ## initial condition
 ## it is important to change m while searching for polarized solutions
-[n,m,mu] = [0.5,0.001,0.2]
+[n,m,mu] = [0.5,0.4999,-0.05]
+#[n,m,mu] = [0.5,0.0,0.2]
 
 PrintAndWrite('\nCalculating Hartree-Fock solution:',logfname)
 [nold,mold,muold] = [1e5,1e5,1e5]
-N0_A = sp.array([[(m+n)/2.0,mu],[mu,(m-n)/2.0+1.0]])
+N0_A = sp.array([[m+n,mu],[mu,m-n+1.0]])
 PrintAndWrite('\n    iter\tn\t\tm\t\tmu',logfname)
 t = time()
 niter = 0
@@ -95,8 +97,8 @@ while any([sp.fabs(n-nold) > eps_hf,sp.fabs(m-mold) > eps_hf,sp.fabs(mu-muold) >
 	N0_A = alpha_hf*N0_A+(1.0-alpha_hf)*Nold_A
 	niter += 1
 	PrintAndWrite('  {0: 3d}\t{1: .8f}\t{2: .8f}\t{3: .8f}'.format(niter,n,m,mu),logfname)
-	if niter > 2000:
-		PrintAndWrite('HF: no convergence after 2000 iterations, exit.',logfname)
+	if niter > nmax_iter:
+		PrintAndWrite('HF: no convergence after '+str(nmax_iter)+' iterations, exit.',logfname)
 		exit(1)
 
 PrintAndWrite('  ...done in {0: 3d} seconds.'.format(int(time()-t)),logfname)
@@ -111,7 +113,8 @@ G0_real = PadeContinuation(G0_iw,emax,NRealP,NMatsP,izero)
 #WriteG_real(G0_real,'grhf',logfname)
 WriteG_real(G0_real,'grhf'+p.P['param']+str(par),logfname)
 
-PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:HF_OUT'.format(U,eps,B,n,m,mu),logfname)
+PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:HF_OUT'\
+.format(U,eps,B,n,m,mu),logfname)
 
 ###########################################################
 ## second order correction ################################
@@ -119,7 +122,6 @@ PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:HF_O
 PrintAndWrite('\nCalculating the two-particle bubble...',logfname)
 Chi = TwoParticleBubbleFFT(G0_iw,G0_iw)
 WriteG_iw(Chi,'chiw',logfname)
-
 Chi_real = PadeContinuation(Chi,emax,NRealP,NMatsP,izero)
 WriteG_real(Chi_real,'chir',logfname)
 
@@ -155,8 +157,8 @@ while any([sp.fabs(n-nold) > eps_2nd,sp.fabs(m-mold) > eps_2nd,sp.fabs(mu-muold)
 	[n,m,mu] = Occupation(N_A)
 	niter += 1
 	PrintAndWrite('  {0: 3d}\t{1: .8f}\t{2: .8f}\t{3: .8f}'.format(niter,n,m,mu),logfname)
-	if niter > 2000:
-		PrintAndWrite('2ndPT: no convergence after 2000 iterations, exit.',logfname)
+	if niter > nmax_iter:
+		PrintAndWrite('2ndPT: no convergence after '+str(nmax_iter)+' iterations, exit.',logfname)
 		exit(1)
 
 PrintAndWrite('\nCalculating the 2ndPT interacting Green function...',logfname)
@@ -172,7 +174,8 @@ Gint_real = PadeContinuation(Gint_iw,emax,NRealP,NMatsP,izero)
 WriteG_real(Gint_real,'gr'+p.P['param']+str(par),logfname)
 #WriteG_real(Gint_real,'gr',logfname)
 
-PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:2nd_OUT'.format(U,eps,B,n,m,mu),logfname)
+PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:2nd_OUT'\
+.format(U,eps,B,n,m,mu),logfname)
 
 ## write HDF5 archive
 if WriteHDF5:
