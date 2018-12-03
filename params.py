@@ -24,7 +24,14 @@ P['eps_hf']      = 1e-4
 P['eps_2nd']     = 1e-4
 P['alpha_hf']    = 0.2
 P['alpha_2nd']   = 0.2
+P['magzero']     = 0.0
 P['param']       = 'U'
+
+P['Delta']       = 1.0
+P['GammaL']      = 0.5
+P['GammaR']      = 0.5
+P['GammaN']      = 0.0
+P['P']           = 0.5
 
 P['pade_emax']       = 10.0
 P['pade_NReal']      = 20000
@@ -44,8 +51,14 @@ if config.has_option('params','alpha_hf'):
 	P['alpha_hf'] = float(config.get('params','alpha_hf'))
 if config.has_option('params','alpha_2nd'):
 	P['alpha_2nd'] = float(config.get('params','alpha_2nd'))
+if config.has_option('params','magzero'):
+	P['magzero'] = float(config.get('params','magzero'))
 if config.has_option('params','param'):
 	P['param'] = str(config.get('params','param'))
+
+for pa in ['Delta','GammaL','GammaR','GammaN','P']:
+	if config.has_option('params',pa):
+		P[pa] = float(config.get('params',pa))
 
 ## pade part ##############################################
 if config.has_option('pade','emax'):

@@ -54,9 +54,9 @@ def TotalDensity(G):
 
 def Occupation(N_A):
 	''' calculates n,m,mu from the occupation matrix N '''
-	n  = 0.5*(N_A[0][0]-N_A[1][1]+1.0)
-	m  = 0.5*(N_A[0][0]+N_A[1][1]-1.0)
-	mu = 0.5*(N_A[0][1]+N_A[1][0])
+	n  =  0.5*(N_A[0][0]-N_A[1][1]+1.0)
+	m  =  0.5*(N_A[0][0]+N_A[1][1]-1.0)
+	mu =  0.5*(N_A[0][1]+N_A[1][0])
 	return [n,m,mu]
 
 ###########################################################
@@ -86,20 +86,14 @@ def HybOffDiag(GammaL,GammaR,Delta,P,W,iw):
 def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
 	''' constructs the non-interacting Green function as the input '''
 	[beta,U,Delta,GL,GR,GN,eps,P,B] = params_A
-	#[n,m,mu] = Occupation(N_A)
-	#print n,m,mu
+	[n,m,mu] = Occupation(N_A)
 	V2 = BW*GN/sp.pi  # hybridization with normal lead
 	## define lambdas (hybridizations are real)
-	## old definitions from the SQUAD-CTHYB code:
-	#GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + B + U*m 
-	#GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
-	#GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
-	#GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + B + U*m
-	## new definitions:
-	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - eps - U/2.0 + B + U*N_A[1][1]
-	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*N_A[0][1]
-	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*N_A[1][0]
-	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + eps - U/2.0 + B + U*N_A[0][0]
+	[n,m,mu] = Occupation(N_A)
+	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + (B + U*m)
+	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
+	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
+	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + (B + U*m)
 	## define GF objects
 	GFinv = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
 	GF    = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)

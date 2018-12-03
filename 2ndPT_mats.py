@@ -32,11 +32,11 @@ U      = float(argv[1])
 beta   = float(argv[2])
 eps    = float(argv[3])
 B      = float(argv[4])
-Delta  = 1.0
-GammaL = 0.5
-GammaR = 0.5
-GammaN = 0.0
-P      = 0.5
+P      = float(argv[5])
+Delta  = float(p.P['Delta'])
+GammaL = float(p.P['GammaL'])
+GammaR = float(p.P['GammaR'])
+GammaN = float(p.P['GammaN'])
 
 ## energy cutoffs in imaginary and real axes
 iw_cut = p.P['iw_cut'] # energy cutoff in Matsubaras
@@ -73,18 +73,20 @@ PrintAndWrite('Inverse temperature beta ={0: .3f}, half-bandwidth W = {1: .3f}'\
 .format(beta,BW),logfname)
 PrintAndWrite('Using {0: 3d} Matsubara frequencies, cutoff: {1: .3f}'\
 .format(int(NMats),float(iw_cut)),logfname)
+PrintAndWrite('Initial magnetization: m ={0: .3f}'.format(float(p.P['magzero'])),logfname)
+
 
 ###########################################################
 ## Hartree-Fock calculation ###############################
 
 ## initial condition
 ## it is important to change m while searching for polarized solutions
-[n,m,mu] = [0.5,0.4999,-0.05]
-#[n,m,mu] = [0.5,0.0,0.2]
+muzero = 0.2 if p.P['magzero'] == 0.0 else -0.05 ## initial value of mu
+[n,m,mu] = [0.5,p.P['magzero'],muzero]
 
 PrintAndWrite('\nCalculating Hartree-Fock solution:',logfname)
 [nold,mold,muold] = [1e5,1e5,1e5]
-N0_A = sp.array([[m+n,mu],[mu,m-n+1.0]])
+N0_A = sp.array([[m+n,mu],[mu,m+1.0-n]])
 PrintAndWrite('\n    iter\tn\t\tm\t\tmu',logfname)
 t = time()
 niter = 0
@@ -115,6 +117,8 @@ WriteG_real(G0_real,'grhf'+p.P['param']+str(par),logfname)
 
 PrintAndWrite('{0: .5f}\t{1: .5f}\t{2: .5f}\t{3: .8f}\t{4: .8f}\t{5: .8f}\t:HF_OUT'\
 .format(U,eps,B,n,m,mu),logfname)
+
+#exit() ## stop after HF calculation
 
 ###########################################################
 ## second order correction ################################

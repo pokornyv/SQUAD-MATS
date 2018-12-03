@@ -17,7 +17,10 @@ https://github.com/pokornyv/SQUAD-MATS
 
 #### Usage:
 - set parameters in *squad.in*  
-- run `python 2ndPT_mats.py <float U> <float β> <float ε> <float B>`  
+- run `python 2ndPT_mats.py <float U> <float β> <float ε> <float h> <float P>`  
+where *U* is the ineraction strength, *β* is the inverse temperature, *ε* is the
+gate voltage (energy shift of levels w.r.t a half-filled dot), *h* is the magnetic field
+and *P=φ/π* is the phase difference.  
 
 #### Output files:
 - *2ndPT.log* - log file  
@@ -34,10 +37,10 @@ Output of the HF calculation and 2ndPT calculation can be extracted from *2ndPT.
 `grep ":HF_OUT" 2ndPT.log` and `grep ":2nd_OUT" 2ndPT.log` (linux only).  
 
 #### List of files:
-- *2ndPT_mats* - main code  
+- *2ndPT_mats.py* - main code  
 - *matslib.py* - library of functions  
 - *squad.in* - parameter file  
-- *params.py* - script reading parameter file *squad.in*  
+- *params.py* - script reading parameter file *squad.in*, also sets default values  
 - *README.md* - this file  
 - *spectrum_map.py* - script to generate input for color maps of the spectral function  
 
@@ -45,12 +48,11 @@ Output of the HF calculation and 2ndPT calculation can be extracted from *2ndPT.
 - [x] add magnetic field dependence  
 - [x] parameters should be read from external file  
 - [ ] test the code out of half-filling with magnetic field  
-- [ ] add HDF5 support  
-- [ ] implement the solution for the double-degenerate ground state from [Logan2014]  
+- [ ] add full HDF5 support  
 
 #### References:
 - M. Žonda, V. Pokorný, V. Janiš and T. Novotný, Phys. Rev. B **93**, 024523 (2016).  
 - M. Žonda, V. Pokorný, V. Janiš and T. Novotný, Sci. Rep. **5**, 8821 (2015).  
-- O. Parcollet, M. Ferrero, T. Ayral, H. Hafermann, I. Krivenko, L. Messio, and P. Seth, *Comput. Phys. Commun.* **196**, 398 (2015).  
-- D. E. Logan, A. P. Tucker, and M. R. Galpin, Phys. Rev. B **90**, 075150 (2014).  
+- O. Parcollet, M. Ferrero, T. Ayral, H. Hafermann, I. Krivenko, L. Messio, and P. Seth, 
+*Comput. Phys. Commun.* **196**, 398 (2015).  
 
