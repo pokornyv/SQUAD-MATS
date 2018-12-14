@@ -85,15 +85,15 @@ def HybOffDiag(GammaL,GammaR,Delta,P,W,iw):
 
 def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
 	''' constructs the non-interacting Green function as the input '''
-	[beta,U,Delta,GL,GR,GN,eps,P,B] = params_A
+	[beta,U,Delta,GL,GR,GN,eps,P,h] = params_A
 	[n,m,mu] = Occupation(N_A)
 	V2 = BW*GN/sp.pi  # hybridization with normal lead
 	## define lambdas (hybridizations are real)
 	[n,m,mu] = Occupation(N_A)
-	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + (B + U*m)
+	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + (h + U*m)
 	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
 	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
-	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + (B + U*m)
+	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + (h + U*m)
 	## define GF objects
 	GFinv = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
 	GF    = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
@@ -148,7 +148,7 @@ def TwoParticleBubbleFFT(GF1,GF2t):
 	GF2tau << InverseFourier(GF2)
 	flip_A = sp.array([[-1.0,1.0],[1.0,-1.0]])
 	Chitau.data[:] = flip_A*GF1tau.data[:]*GF2tau.data[:]
-	#WriteG_tau(Chitau,'chit','out.log')
+	#WriteG_tau(Chitau,'chitau','out.log')
 	Chi << Fourier(Chitau)
 	## fitting the tail
 	Chi.tail.zero()
@@ -171,9 +171,9 @@ def SelfEnergy(GF,Psi):
 	for i,j in product(GF.indices, repeat = 2): Kernel[i,j] << Psi
 	GFtau << InverseFourier(GF)
 	Ktau  << InverseFourier(Kernel)
-	flip_A = sp.array([[-1.0,-1.0],[-1.0,-1.0]])
-	Sigmatau.data[:] = flip_A*GFtau.data[:]*Ktau.data[:]
-	#WriteG_tau(Sigmatau,'st','out.log')
+	##flip_A = sp.array([[-1.0,-1.0],[-1.0,-1.0]])
+	Sigmatau.data[:] = -GFtau.data[:]*Ktau.data[:]
+	#WriteG_tau(Sigmatau,'sigmatau','out.log')
 	Sigma << Fourier(Sigmatau)
 	## fitting the tail
 	Sigma.tail.zero()
@@ -183,7 +183,6 @@ def SelfEnergy(GF,Psi):
 	## Sigma contains artefacts from FFT at high frequencies, do not fit up to NMats
 	Sigma.fit_tail(fixed_tail,6,int(0.8*NMats),int(0.9*NMats))
 	return Sigma
-
 
 ###########################################################
 ## functions for writing data files #######################
@@ -260,7 +259,8 @@ def WriteMatrix(X_A,bands_T,Xtype,logfname):
 	NBand = len(bands_T)
 	for i,j in product(range(NBand), repeat = 2):
 		if sp.imag(X_A[i][j]) == 0: out_text += '{0: .6f}\t'.format(float(sp.real(X_A[i][j])))
-		else: out_text += '{0: .6f}{1:+0.6f}i\t'.format(float(sp.real(X_A[i][j])),float(sp.imag(X_A[i][j])))
+		else: out_text += '{0: .6f}{1:+0.6f}i\t'.format(float(sp.real(X_A[i][j])),\
+		float(sp.imag(X_A[i][j])))
 		if j==len(bands_T)-1: out_text += '\n'
 	PrintAndWrite(out_text,logfname)
 

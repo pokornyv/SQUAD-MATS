@@ -1,20 +1,23 @@
 [params]
-iw_cut      : 100.0	
-BW          : 1000.0
-eps_hf      : 1e-4
-eps_2nd     : 1e-4
-alpha_hf    : 0.5
-alpha_2nd   : 0.5
-param       : U
+iw_cut        : 100.0	
+BW            : 1000.0
+eps_hf        : 1e-4
+eps_2nd       : 1e-4
+alpha_hf      : 0.5
+alpha_2nd     : 0.5
+magzero       : 0.0
+param         : U
 
-Delta       : 1.0
-GammaL      : 0.5
-GammaR      : 0.5
-GammaN      : 0.5
+Delta         : 1.0
+GammaL        : 0.5
+GammaR        : 0.5
+GammaN        : 0.0
+
+WriteAuxFiles : 1
 
 [pade]
-emax        : 10.0
-NRealPoints : 20000
-NMatsubara  : 50
-izero       : 1e-3
+emax          : 10.0
+NRealPoints   : 20000
+NMatsubara    : 50
+izero         : 1e-3
 

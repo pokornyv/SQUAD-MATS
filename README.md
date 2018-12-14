@@ -31,7 +31,7 @@ and *P=φ/π* is the phase difference.
 - *psiw*, *psir* - kernel of the Schwinger-Dyson equation in Matsubaras/real frequencies (for development only)  
 
 *grhf* and *gr* files can be labeled by the value of the parameter set in *squad.in* (*param*), 
-e.g. *grU2.0* or *grB0.1* etc. Useful for generating maps using *spectrum_map.py*  
+e.g. *grU2.0* or *grh0.1* etc. Useful for generating maps using *spectrum_map.py*  
 
 Output of the HF calculation and 2ndPT calculation can be extracted from *2ndPT.log*: using 
 `grep ":HF_OUT" 2ndPT.log` and `grep ":2nd_OUT" 2ndPT.log` (linux only).  
@@ -47,8 +47,8 @@ Output of the HF calculation and 2ndPT calculation can be extracted from *2ndPT.
 #### TODO list:
 - [x] add magnetic field dependence  
 - [x] parameters should be read from external file  
-- [ ] test the code out of half-filling with magnetic field  
-- [ ] add full HDF5 support  
+- [ ] test the symmetries out of half-filling with magnetic field  
+- [ ] add full HDF5 support (write and read)  
 
 #### References:
 - M. Žonda, V. Pokorný, V. Janiš and T. Novotný, Phys. Rev. B **93**, 024523 (2016).  
