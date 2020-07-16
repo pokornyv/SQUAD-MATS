@@ -1,13 +1,15 @@
-## second-order PT solver for the superconducting quantum dot
-## Matsubara frequency formulation
-## uses TRIQS 1.4
-## Vladislav Pokorny; 2018; pokornyv@fzu.cz
+################################################################
+# SQUAD-MATS - second-order PT solver for the sc quantum dot   #
+# Copyright (C) 2018-2020  Vladislav Pokorny; pokornyv@fzu.cz  #
+# homepage: github.com/pokornyv/SQUAD-MATS                     #
+# matslib.py - library of functions                            #
+# method described in                                          #
+#    Sci. Rep. 5, 8821 (2015).                                 #
+#    Phys. Rev. B 93, 024523 (2016).                           #
+################################################################
 
-import scipy as sp
-from time import ctime
-from itertools import product
-from pytriqs.gf.local import *
-from pytriqs.gf.local.descriptors import Function
+from config import *
+from iolib import *
 
 ###########################################################
 ## general functions ######################################
@@ -34,24 +36,6 @@ def Langevin(x):
 	return 0.0 if x==0.0 else 1.0/sp.tanh(x)-1.0/x
 
 
-def PrintAndWrite(line,fname):
-	'''	print the same line to stdout and to file fname '''
-	print(line)
-	f = open(fname,'a')
-	f.write(line+'\n')
-	f.close()
-
-
-def TotalDensity(G):
-	''' calculates the density from a Green function '''
-	bands_T = G.indices
-	NBand = len(bands_T)
-	N_A = sp.zeros([NBand,NBand])
-	for i,j in product(range(NBand), repeat = 2):
-		N_A[i][j] = sp.real(G[bands_T[i],bands_T[j]].total_density())
-	return N_A
-
-
 def Occupation(N_A):
 	''' calculates n,m,mu from the occupation matrix N '''
 	n  =  0.5*(N_A[0][0]-N_A[1][1]+1.0)
@@ -59,41 +43,40 @@ def Occupation(N_A):
 	mu =  0.5*(N_A[0][1]+N_A[1][0])
 	return [n,m,mu]
 
+
 ###########################################################
 ## non-interacting Green function #########################
 
-def IntFiniteBW(Delta,W,iw):
+def IntFiniteBW(Delta,iw):
 	''' integral enering hybridizations for finite bandwidth 2W '''
-	sq = lambda x: sp.sqrt(Delta**2+sp.imag(x)**2)
-	return 2.0/(sp.pi*sq(iw))*sp.arctan2(W,sq(iw))
+	sq = lambda x: np.sqrt(Delta**2+np.imag(x)**2)
+	return 2.0/(np.pi*sq(iw))*np.arctan2(BW,sq(iw))
 
 
-def HybDiag(GammaL,GammaR,Delta,W,iw):
+def HybDiag(iw):
 	''' diagonal part of the finite-bandwidth sc lead hybridization, real 
 	does not contain the iw_n factor from the matrix '''
-	return (GammaL+GammaR)*IntFiniteBW(Delta,W,iw)
+	return (GammaL+GammaR)*IntFiniteBW(Delta,iw)
 
 
-def HybOffDiag(GammaL,GammaR,Delta,P,W,iw):
+def HybOffDiag(iw):
 	''' off-diagonal part of the finite-bandwidth sc lead hybridization 
 	PhiS angle keeps the hybridization real '''
-	Phi = P*sp.pi
-	PhiS = sp.arctan((GammaL-GammaR)/(GammaL+GammaR+1e-12)*sp.tan(Phi/2.0))
-	return Delta*sp.exp(1.0j*PhiS)*\
-	(GammaL*sp.exp(-1.0j*Phi/2.0)+GammaR*sp.exp(1.0j*Phi/2.0))*IntFiniteBW(Delta,W,iw)
+	PhiS = np.arctan((GammaL-GammaR)/(GammaL+GammaR+1e-12)*np.tan(Phi/2.0))
+	return Delta*np.exp(1.0j*PhiS)*\
+	(GammaL*np.exp(-1.0j*Phi/2.0)+GammaR*np.exp(1.0j*Phi/2.0))*IntFiniteBW(Delta,iw)
 
 
-def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
-	''' constructs the non-interacting Green function as the input '''
-	[beta,U,Delta,GL,GR,GN,eps,P,h] = params_A
+def GFzero(N_A,FitMin,FitMax,NTerms):
+	''' constructs the Hartree-Fock Green function as the input '''
 	[n,m,mu] = Occupation(N_A)
-	V2 = BW*GN/sp.pi  # hybridization with normal lead
+	V2 = BW*GammaN/sp.pi  # hybridization with normal lead
 	## define lambdas (hybridizations are real)
 	[n,m,mu] = Occupation(N_A)
-	GFinv11 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) - (eps + U*(n-0.5)) + (h + U*m)
-	GFinv12 = lambda x: HybOffDiag(GL,GR,Delta,P,BW,x) - U*mu
-	GFinv21 = lambda x: sp.conj(HybOffDiag(GL,GR,Delta,P,BW,x)) - U*mu
-	GFinv22 = lambda x: x*(1.0 + HybDiag(GL,GR,Delta,BW,x)) + (eps + U*(n-0.5)) + (h + U*m)
+	GFinv11 = lambda x: x*(1.0 + HybDiag(x)) - (eps + U*(n-0.5)) + (h + U*m)
+	GFinv12 = lambda x: HybOffDiag(x) - U*mu
+	GFinv21 = lambda x: sp.conj(HybOffDiag(x)) - U*mu
+	GFinv22 = lambda x: x*(1.0 + HybDiag(x)) + (eps + U*(n-0.5)) + (h + U*m)
 	## define GF objects
 	GFinv = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
 	GF    = GfImFreq(indices = bands_T,beta = beta,n_points = NMats)
@@ -103,30 +86,24 @@ def GFzero(params_A,bands_T,N_A,BW,NMats,FitMin,FitMax,NTerms):
 	GFinv[bands_T[0],bands_T[1]] << Function(GFinv12)
 	GFinv[bands_T[1],bands_T[0]] << Function(GFinv21)
 	GFinv[bands_T[1],bands_T[1]] << Function(GFinv22) - V2*Flat(BW)
-	## fit the tail
-	GFinv.tail.zero()
-	fixed_tail = TailGf(2,2,1,-1)
-	fixed_tail[-1] = sp.eye(2)
-	GFinv.fit_tail(fixed_tail,NTerms,FitMin,FitMax)
 	## calculate inverse
 	GF << inverse(GFinv)
-	## refit the tail, just in case.
-	GF.tail.zero()
-	fixed_tail = TailGf(2,2,3,-1)
-	fixed_tail[-1] = sp.zeros([2,2])
-	fixed_tail[ 0] = sp.zeros([2,2])
-	fixed_tail[ 1] = sp.eye(2)
-	GF.fit_tail(fixed_tail,NTerms,FitMin,FitMax)
+	## fit the tail
+	moments_A = np.zeros((0,2,2),dtype=complex)
+	## tail object is a tuple!
+	tail = fit_tail_on_window(GF, n_min=FitMin,n_max=FitMax,n_tail_max=10*FitMax,known_moments=moments_A,expansion_order=8)
+	replace_by_tail(GF,sp.array(tail[0]),n_min=FitMin)
+	if GF.is_gf_hermitian() and mpi.is_master_node():
+		PrintAndWrite(' - Non-interacting Green function is Hermitean',outfile)
 	return GF
-
 
 ###########################################################
 ## Pade analytic continuation #############################
 
-def PadeContinuation(GFw,emax,NRealP,NMats,izero):
+def PadeContinuation(GFw):
 	''' Pade analytic continuation for the Matsubara Green function '''
-	GFr = GfReFreq(indices = GFw.indices, window = (-emax,emax), n_points = NRealP)
-	GFr.set_from_pade(GFw, n_points = NMats, freq_offset = izero)
+	GFr = GfReFreq(indices = GFw.indices, window = (-pade_emax,pade_emax), n_points = pade_NReal)
+	GFr.set_from_pade(GFw, n_points = pade_NMats, freq_offset = pade_izero)
 	return GFr
 
 ###########################################################
@@ -135,28 +112,29 @@ def PadeContinuation(GFw,emax,NRealP,NMats,izero):
 def TwoParticleBubbleFFT(GF1,GF2t):
 	''' calculate the two-particle bubble using FFT '''
 	NMats = len(GF1.data)/2
-	GF1tau = GfImTime(indices = GF1.indices, beta = GF1.beta, n_points = 4*NMats+1)
-	GF2tau = GfImTime(indices = GF1.indices, beta = GF1.beta, n_points = 4*NMats+1)
-	Chitau = GfImTime(indices = GF1.indices, beta = GF1.beta, n_points = 4*NMats+1, statistic = 'Boson')
-	Chi    = GfImFreq(indices = GF1.indices, beta = GF1.beta, n_points = NMats, statistic = 'Boson')
+	GF1tau = GfImTime(indices = GF1.indices, beta = GF1.mesh.beta, n_points = 6*NMats+1)
+	GF2tau = GfImTime(indices = GF1.indices, beta = GF1.mesh.beta, n_points = 6*NMats+1)
+	Chitau = GfImTime(indices = GF1.indices, beta = GF1.mesh.beta, n_points = 6*NMats+1, statistic = 'Boson')
+	Chi    = GfImFreq(indices = GF1.indices, beta = GF1.mesh.beta, n_points = NMats, statistic = 'Boson')
 	GF2 = GF2t.copy()
 	GF2['up','up'].data[:] =	GF2t['dn','dn'].data[:]
 	GF2['up','dn'].data[:] =	GF2t['dn','up'].data[:]
 	GF2['dn','up'].data[:] =	GF2t['up','dn'].data[:]
 	GF2['dn','dn'].data[:] =	GF2t['up','up'].data[:]
-	GF1tau << InverseFourier(GF1)
-	GF2tau << InverseFourier(GF2)
-	flip_A = sp.array([[-1.0,1.0],[1.0,-1.0]])
+	GF1tau << Fourier(GF1)
+	GF2tau << Fourier(GF2)
+	flip_A = sp.ones([NBand,NBand])-2*sp.eye(NBand)
 	Chitau.data[:] = flip_A*GF1tau.data[:]*GF2tau.data[:]
-	#WriteG_tau(Chitau,'chitau','out.log')
+	WriteG_tau(Chitau,'chitau')
 	Chi << Fourier(Chitau)
-	## fitting the tail
-	Chi.tail.zero()
-	fixed_tail = TailGf(2,2,2,-1)
-	fixed_tail[-1] = sp.zeros([2,2])
-	fixed_tail[ 0] = sp.zeros([2,2])
+	## fitting the tail	
+	moments_A = np.zeros((0,2,2),dtype=complex)
 	## Chi contains artefacts from FFT at high frequencies, do not fit up to NMats
-	Chi.fit_tail(fixed_tail,6,int(0.8*NMats),int(0.9*NMats))
+	fitmin = int(0.8*NMats)
+	fitmax = int(0.9*NMats)
+	tail = fit_hermitian_tail_on_window(Chi,n_min=fitmin,n_max=fitmax,n_tail_max=10*fitmax,known_moments=moments_A,expansion_order=6)
+	#print(tail[0])
+	#replace_by_tail(Chi,sp.array(tail[0]),n_min=6)
 	return Chi
 
 
@@ -164,105 +142,26 @@ def SelfEnergy(GF,Psi):
 	''' calculate the self-energy from SD equation using FFT '''
 	NMats = len(GF.data)/2
 	Sigma = GF.copy()
-	Sigmatau = GfImTime(indices = GF.indices, beta = GF.beta, n_points = 4*NMats+1)
-	GFtau = GfImTime(indices = GF.indices, beta = GF.beta, n_points = 4*NMats+1)
-	Ktau  = GfImTime(indices = GF.indices, beta = GF.beta, n_points = 4*NMats+1, statistic = 'Boson')
-	Kernel = GfImFreq(indices = GF.indices, beta = GF.beta, n_points = NMats, statistic = 'Boson')
-	for i,j in product(GF.indices, repeat = 2): Kernel[i,j] << Psi
-	GFtau << InverseFourier(GF)
-	Ktau  << InverseFourier(Kernel)
-	##flip_A = sp.array([[-1.0,-1.0],[-1.0,-1.0]])
+	Sigmatau = GfImTime(indices = GF.indices, beta = GF.mesh.beta, n_points = 6*NMats+1)
+	GFtau  = GfImTime(indices = GF.indices, beta = GF.mesh.beta, n_points = 6*NMats+1)
+	Ktau   = GfImTime(indices = GF.indices, beta = GF.mesh.beta, n_points = 6*NMats+1, statistic = 'Boson')
+	Kernel = GfImFreq(indices = GF.indices, beta = GF.mesh.beta, n_points = NMats, statistic = 'Boson')
+	for i,j in product(GF.indices[0], repeat = 2): 
+		Kernel[i,j].data[:] = Psi.data[:,0,0]
+	GFtau << Fourier(GF)
+	Ktau  << Fourier(Kernel)
 	Sigmatau.data[:] = -GFtau.data[:]*Ktau.data[:]
-	#WriteG_tau(Sigmatau,'sigmatau','out.log')
+	WriteG_tau(Sigmatau,'sigmatau')
 	Sigma << Fourier(Sigmatau)
 	## fitting the tail
-	Sigma.tail.zero()
-	fixed_tail = TailGf(2,2,2,-1)
-	fixed_tail[-1] = sp.zeros([2,2])
-	fixed_tail[ 0] = sp.zeros([2,2])
+	moments_A = np.zeros((0,2,2),dtype=complex)
 	## Sigma contains artefacts from FFT at high frequencies, do not fit up to NMats
-	Sigma.fit_tail(fixed_tail,6,int(0.8*NMats),int(0.9*NMats))
+	fitmin = int(0.8*NMats)
+	fitmax = int(0.9*NMats)
+	tail = fit_hermitian_tail_on_window(Sigma,n_min=fitmin,n_max=fitmax,n_tail_max=10*fitmax,known_moments=moments_A,expansion_order=6)
+	#print(tail[0])
+	#replace_by_tail(Sigma,sp.array(tail[0]),n_min=6)
 	return Sigma
-
-###########################################################
-## functions for writing data files #######################
-
-def WriteG_iw(GF,fname,logfname):
-	''' writes a Matsubara function to a file '''
-	fout = open(fname,'w')
-	fout.write('# file written on '+ctime()+'\n')
-	NMats = len(GF.data)
-	bands_T = GF.indices
-	NBand = len(bands_T)
-	MatsFreq_F = sp.zeros(NMats)
-	k = 0
-	for iw in GF.mesh:
-		MatsFreq_F[k] = sp.imag(iw)
-		k += 1
-	for i,j in product(range(NBand), repeat = 2):
-		for nw in range(NMats):
-			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
-			.format(float(MatsFreq_F[nw]),float(sp.real(GF[bands_T[i],bands_T[j]].data[nw][0][0]))\
-			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
-		fout.write('\n\n')
-	fout.close()
-	PrintAndWrite('  File '+fname+' written.',logfname)
-
-
-def WriteG_tau(GF,fname,logfname):
-	''' writes a Matsubara function to a file '''
-	fout = open(fname,'w')
-	fout.write('# file written on '+ctime()+'\n')
-	bands_T = GF.indices
-	NBand = len(bands_T)
-	NTau = len(GF.data)
-	Tau_F = sp.zeros(NTau)
-	k = 0
-	for tau in GF.mesh:
-		Tau_F[k] = sp.real(tau)
-		k += 1
-	for i,j in product(range(NBand), repeat = 2):
-		for tau in range(NTau):
-			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
-			.format(float(Tau_F[tau]),float(sp.real(GF[bands_T[i],bands_T[j]].data[tau][0][0]))\
-			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[tau][0][0]))))
-		fout.write('\n\n')
-	fout.close()
-	PrintAndWrite('  File '+fname+' written.',logfname)
-
-
-def WriteG_real(GF,fname,logfname):
-	''' writes a function of a real frequency to a file '''
-	fout = open(fname,'w')
-	fout.write('# file written on '+ctime()+'\n')
-	bands_T = GF.indices
-	NBand = len(bands_T)
-	Freq_F = sp.zeros(len(GF.data))
-	k = 0
-	for w in GF.mesh:
-		Freq_F[k] = sp.real(w)
-		k += 1
-	for i,j in product(range(NBand), repeat = 2):
-		for nw in range(len(Freq_F)):
-			fout.write('{0:.12f}\t{1:.12f}\t{2:.12f}\n'\
-			.format(float(Freq_F[nw]),float(sp.real(GF[bands_T[i],bands_T[j]].data[nw][0][0]))\
-			,float(sp.imag(GF[bands_T[i],bands_T[j]].data[nw][0][0]))))
-		fout.write('\n\n')
-	fout.close()
-	PrintAndWrite('  File '+fname+' written.',logfname)
-
-
-def WriteMatrix(X_A,bands_T,Xtype,logfname):
-	''' writes a dict or matrix with two indices to output in a matrix form 
-	input: Xtype = "D" = dict, "M" = matrix '''
-	out_text = ''
-	NBand = len(bands_T)
-	for i,j in product(range(NBand), repeat = 2):
-		if sp.imag(X_A[i][j]) == 0: out_text += '{0: .6f}\t'.format(float(sp.real(X_A[i][j])))
-		else: out_text += '{0: .6f}{1:+0.6f}i\t'.format(float(sp.real(X_A[i][j])),\
-		float(sp.imag(X_A[i][j])))
-		if j==len(bands_T)-1: out_text += '\n'
-	PrintAndWrite(out_text,logfname)
 
 ## matslib.py end ##
 
