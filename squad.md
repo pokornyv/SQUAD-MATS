@@ -6,8 +6,8 @@
 *BW* - half bandwidth, default: 100.0  
 *eps_hf* - convergence criterium for Hartree-Fock densities, default: 1e-4  
 *eps_2nd* - convergence criterium for final densities, default: 1e-4  
-*alpha_hf* - mixing parameter for Hartree-Fock calculation, default: 0.5  
-*alpha_2nd* - mixing parameter for final density, default: 0.5  
+*alpha_hf* - mixing parameter for Hartree-Fock calculation; alpha=1 means no mixing, default: 0.5  
+*alpha_2nd* - mixing parameter for final density; alpha=1 means no mixing, default: 0.5  
 *magzero* - initial value of the magnetization, useful while searching for polarized solutions, default: 0.0  
 *param* - independent parameter for output, e.g. U, eps, Phi...  
 

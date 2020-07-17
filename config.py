@@ -161,5 +161,5 @@ NBand = len(bands_T)
 params_A = [beta,U,Delta,GammaL,GammaR,GammaN,eps,P,h]
 NMats = int(0.5*(beta*iw_cut/np.pi)+1.0)
 
-## config.py end ##
+## config.py END ##
 

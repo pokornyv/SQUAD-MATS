@@ -121,11 +121,14 @@ def TwoParticleBubbleFFT(GF1,GF2t):
 	GF2['up','dn'].data[:] =	GF2t['dn','up'].data[:]
 	GF2['dn','up'].data[:] =	GF2t['up','dn'].data[:]
 	GF2['dn','dn'].data[:] =	GF2t['up','up'].data[:]
+	moments_A = np.zeros((0,2,2),dtype=complex)
+	tail1 = fit_tail(GF1)
+	tail2 = fit_tail(GF2)
 	GF1tau << Fourier(GF1)
 	GF2tau << Fourier(GF2)
 	flip_A = sp.ones([NBand,NBand])-2*sp.eye(NBand)
 	Chitau.data[:] = flip_A*GF1tau.data[:]*GF2tau.data[:]
-	WriteG_tau(Chitau,'chitau')
+	#WriteG_tau(Chitau,'chitau')
 	Chi << Fourier(Chitau)
 	## fitting the tail	
 	moments_A = np.zeros((0,2,2),dtype=complex)
@@ -151,7 +154,7 @@ def SelfEnergy(GF,Psi):
 	GFtau << Fourier(GF)
 	Ktau  << Fourier(Kernel)
 	Sigmatau.data[:] = -GFtau.data[:]*Ktau.data[:]
-	WriteG_tau(Sigmatau,'sigmatau')
+	#WriteG_tau(Sigmatau,'sigmatau')
 	Sigma << Fourier(Sigmatau)
 	## fitting the tail
 	moments_A = np.zeros((0,2,2),dtype=complex)
@@ -163,5 +166,5 @@ def SelfEnergy(GF,Psi):
 	#replace_by_tail(Sigma,sp.array(tail[0]),n_min=6)
 	return Sigma
 
-## matslib.py end ##
+## matslib.py END ##
 
